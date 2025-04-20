@@ -2,6 +2,8 @@ import { DPT, PeerInfo } from '@ethereumjs/devp2p';
 import { Buffer } from 'buffer';
 import { setTimeout } from 'timers/promises';
 import dns from 'dns/promises';
+import fs from 'fs/promises';
+import path from 'path';
 
 // Configuration
 const config = {
@@ -25,6 +27,9 @@ const config = {
     discovery: {
         refreshInterval: 30000, // 30 seconds
         maxPeers: 25,
+        discoveryTimeout: 300000, // 5 minutes
+        maxDiscoveryRounds: 20, // Increased from 10 to 20
+        minDiscoveryRounds: 3, // Minimum rounds to ensure good coverage
     },
 };
 
@@ -53,10 +58,16 @@ class DevP2PDiscovery {
     private dpt: DPT;
     private discoveredPeers: Map<string, PeerInfo>;
     private refreshInterval: NodeJS.Timeout | null;
+    private discoveryRounds: number;
+    private lastDiscoveryCount: number;
+    private discoveryComplete: boolean;
 
     constructor() {
         this.discoveredPeers = new Map();
         this.refreshInterval = null;
+        this.discoveryRounds = 0;
+        this.lastDiscoveryCount = 0;
+        this.discoveryComplete = false;
 
         // Initialize DPT
         this.dpt = new DPT(config.privateKey, {
@@ -130,15 +141,48 @@ class DevP2PDiscovery {
 
     private async refreshDiscovery(): Promise<void> {
         try {
+            // Check if we've reached the maximum discovery rounds
+            if (this.discoveryRounds >= config.discovery.maxDiscoveryRounds) {
+                console.log(
+                    `Maximum discovery rounds (${config.discovery.maxDiscoveryRounds}) reached`
+                );
+                this.discoveryComplete = true;
+                return;
+            }
+
+            // Check if no new peers were discovered in the last round
+            const currentCount = this.discoveredPeers.size;
+            if (
+                currentCount === this.lastDiscoveryCount &&
+                this.discoveryRounds >= config.discovery.minDiscoveryRounds
+            ) {
+                console.log(
+                    'No new peers discovered in the last round and minimum rounds completed'
+                );
+                this.discoveryComplete = true;
+                return;
+            }
+
+            // Update the last discovery count
+            const newPeers = currentCount - this.lastDiscoveryCount;
+            this.lastDiscoveryCount = currentCount;
+            this.discoveryRounds++;
+
             // Refresh the DPT table
             await this.dpt.refresh();
             console.log(
-                'Discovery refreshed. Current peers:',
-                this.discoveredPeers.size
+                `Discovery round ${this.discoveryRounds}/${config.discovery.maxDiscoveryRounds} completed. ` +
+                    `Current peers: ${this.discoveredPeers.size} (${
+                        newPeers > 0 ? `+${newPeers} new` : 'no new'
+                    } peers)`
             );
         } catch (err) {
             console.error('Error during discovery refresh:', err);
         }
+    }
+
+    isDiscoveryComplete(): boolean {
+        return this.discoveryComplete;
     }
 
     getDiscoveredPeers(): PeerInfo[] {
@@ -148,6 +192,30 @@ class DevP2PDiscovery {
     getPeerCount(): number {
         return this.discoveredPeers.size;
     }
+
+    async saveResultsToFile(): Promise<void> {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `discovery-results-${timestamp}.json`;
+        const results = {
+            timestamp: new Date().toISOString(),
+            totalPeers: this.getPeerCount(),
+            peers: this.getDiscoveredPeers().map((peer) => ({
+                address: peer.address,
+                udpPort: peer.udpPort,
+                tcpPort: peer.tcpPort,
+            })),
+        };
+
+        try {
+            await fs.writeFile(
+                path.join(process.cwd(), 'results', filename),
+                JSON.stringify(results, null, 2)
+            );
+            console.log(`Results saved to ${filename}`);
+        } catch (err) {
+            console.error('Error saving results to file:', err);
+        }
+    }
 }
 
 // Main function
@@ -155,12 +223,27 @@ async function main() {
     const discovery = new DevP2PDiscovery();
 
     try {
+        // Create results directory if it doesn't exist
+        await fs.mkdir(path.join(process.cwd(), 'results'), {
+            recursive: true,
+        });
+
         // Start discovery
         await discovery.start();
 
-        // Run for 2 minutes
-        console.log('Running discovery for 2 minutes...');
-        await setTimeout(120000);
+        // Run until discovery is complete or timeout
+        console.log('Starting network discovery...');
+        const startTime = Date.now();
+
+        while (!discovery.isDiscoveryComplete()) {
+            await setTimeout(1000); // Check every second
+
+            // Check for timeout
+            if (Date.now() - startTime > config.discovery.discoveryTimeout) {
+                console.log('Discovery timeout reached');
+                break;
+            }
+        }
 
         // Stop discovery
         await discovery.stop();
@@ -177,6 +260,9 @@ async function main() {
                 })`
             );
         });
+
+        // Save results to file
+        await discovery.saveResultsToFile();
     } catch (err) {
         console.error('Error in main process:', err);
     }
