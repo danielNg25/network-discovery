@@ -1,0 +1,20 @@
+{
+    "name": "network-discovery",
+    "version": "1.0.0",
+    "description": "EVM node discovery and testing tool",
+    "main": "dist/main.js",
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/main.js",
+        "dev": "ts-node src/main.ts"
+    },
+    "dependencies": {
+        "@ethereumjs/devp2p": "^6.1.3",
+        "axios": "^1.6.7"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.19",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.3.3"
+    }
+}
