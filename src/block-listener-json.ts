@@ -144,7 +144,7 @@ class BlockListener {
 }
 
 // Example usage
-const rpcUrl = 'http://localhost:26545';
+const rpcUrl = 'http://0.0.0.0:26545';
 const listener = new BlockListener(rpcUrl, 1000); // Poll every second
 
 // Handle process termination

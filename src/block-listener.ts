@@ -259,7 +259,7 @@ class BlockListener {
 }
 
 // Example usage with a different Story node endpoint
-const wsUrl = 'wss://opbnb-rpc.publicnode.com';
+const wsUrl = 'wss://0.0.0.0:26546';
 const listener = new BlockListener(wsUrl);
 
 // Handle process termination
