@@ -3,25 +3,6 @@ import path from 'path';
 import axios from 'axios';
 import { JsonRpcProvider } from 'ethers';
 
-interface Peer {
-    address: string;
-    udpPort: number;
-    tcpPort: number;
-}
-
-interface DiscoveryResult {
-    timestamp: string;
-    bootnodes: string[];
-    totalPeers: number;
-    summary: {
-        address: string;
-        udpPort: number;
-        tcpPort: number;
-    }[];
-    discoveryRounds: number;
-    discoveryComplete: boolean;
-}
-
 interface WorkingEndpoint {
     url: string;
     protocol: string;
@@ -29,12 +10,58 @@ interface WorkingEndpoint {
     port: number;
 }
 
+// List of IP addresses to test
+const IP_ADDRESSES = [
+    '34.88.230.215',
+    '34.116.238.126',
+    '91.134.71.21',
+    '162.55.239.166',
+    '65.108.128.251',
+    '37.27.225.52',
+    '69.67.149.105',
+    '35.211.161.35',
+    '35.237.65.141',
+    '195.189.96.121',
+    '152.53.121.15',
+    '178.63.42.97',
+    '211.219.19.79',
+    '207.188.7.169',
+    '51.159.20.50',
+    '18.117.216.69',
+    '34.65.109.135',
+    '51.15.16.14',
+    '132.145.196.86',
+    '146.148.61.172',
+    '141.98.217.86',
+    '34.65.245.189',
+    '34.88.78.125',
+    '146.59.118.198',
+    '152.53.114.91',
+    '57.128.187.32',
+    '134.122.42.130',
+    '152.53.124.150',
+    '35.246.149.9',
+    '46.166.162.42',
+    '35.211.121.91',
+    '34.126.123.46',
+    '141.94.155.97',
+    '35.207.25.245',
+    '35.211.19.204',
+    '34.89.146.250',
+    '150.136.221.45',
+    '34.159.94.117',
+    '57.128.187.248',
+    '103.88.234.227',
+    '65.109.119.56',
+    '141.94.248.83',
+    '141.147.145.117',
+    '135.181.21.165',
+    '144.76.5.118',
+];
+
 class RPCTester {
-    private results: DiscoveryResult | null = null;
     private workingPeers: Map<string, WorkingEndpoint> = new Map();
-    private rpcPorts = [
-        8545, // Standard Ethereum RPC port
-    ];
+    private rpcPorts = [8545, 26545]; // Standard Ethereum RPC port
     private readonly CONCURRENCY_LIMIT = 10;
     private testedCount = 0;
     private workingCount = 0;
@@ -46,44 +73,9 @@ class RPCTester {
         this.resultsFile = `rpc-test-results-${timestamp}.json`;
     }
 
-    async loadLatestResults(): Promise<void> {
-        try {
-            const resultsDir = path.join(process.cwd(), 'results');
-            const files = await fs.readdir(resultsDir);
-
-            if (files.length === 0) {
-                throw new Error('No discovery results found');
-            }
-
-            // Sort files by name (which includes timestamp) and get the latest
-            const latestFile = files
-                .filter((file) => file.startsWith('discovery-summary-'))
-                .sort()
-                .pop();
-
-            if (!latestFile) {
-                throw new Error('No discovery summary found');
-            }
-
-            const filePath = path.join(resultsDir, latestFile);
-            const fileContent = await fs.readFile(filePath, 'utf-8');
-            this.results = JSON.parse(fileContent) as DiscoveryResult;
-
-            console.log(`Loaded discovery results from ${latestFile}`);
-            console.log(`Total peers to test: ${this.results.totalPeers}`);
-        } catch (err) {
-            console.error('Error loading discovery results:', err);
-            throw err;
-        }
-    }
-
     private async saveWorkingEndpoint(
         endpoint: WorkingEndpoint
     ): Promise<void> {
-        if (!this.results) {
-            throw new Error('No discovery results loaded');
-        }
-
         const result = {
             timestamp: new Date().toISOString(),
             endpoint: {
@@ -92,9 +84,8 @@ class RPCTester {
                 address: endpoint.address,
                 port: endpoint.port,
             },
-            discoveryInfo: {
-                originalTimestamp: this.results.timestamp,
-                totalPeers: this.results.totalPeers,
+            testingInfo: {
+                totalIPs: IP_ADDRESSES.length,
                 testedCount: this.testedCount,
                 workingCount: this.workingCount,
             },
@@ -116,14 +107,11 @@ class RPCTester {
         }
     }
 
-    private async testRPCEndpoint(
-        peer: { address: string; tcpPort: number },
-        port: number
-    ): Promise<boolean> {
+    private async testRPCEndpoint(ip: string, port: number): Promise<boolean> {
         const protocols = ['http', 'https'];
 
         for (const protocol of protocols) {
-            const url = `${protocol}://${peer.address}:${port}`;
+            const url = `${protocol}://${ip}:${port}`;
 
             try {
                 console.log(`Trying ${url}...`);
@@ -147,10 +135,10 @@ class RPCTester {
                     const endpoint: WorkingEndpoint = {
                         url,
                         protocol,
-                        address: peer.address,
+                        address: ip,
                         port,
                     };
-                    this.workingPeers.set(`${peer.address}:${port}`, endpoint);
+                    this.workingPeers.set(`${ip}:${port}`, endpoint);
                     await this.saveWorkingEndpoint(endpoint);
                     return true;
                 } catch (ethersErr: any) {
@@ -199,10 +187,10 @@ class RPCTester {
                     const endpoint: WorkingEndpoint = {
                         url,
                         protocol,
-                        address: peer.address,
+                        address: ip,
                         port,
                     };
-                    this.workingPeers.set(`${peer.address}:${port}`, endpoint);
+                    this.workingPeers.set(`${ip}:${port}`, endpoint);
                     await this.saveWorkingEndpoint(endpoint);
                     return true;
                 }
@@ -226,45 +214,31 @@ class RPCTester {
         return false;
     }
 
-    async testAllPeers(): Promise<void> {
-        if (!this.results) {
-            throw new Error('No discovery results loaded');
-        }
-
+    async testAllIPs(): Promise<void> {
         console.log('\nStarting parallel RPC endpoint testing...');
         this.testedCount = 0;
         this.workingCount = 0;
 
-        // Process peers in chunks to maintain concurrency limit
-        for (
-            let i = 0;
-            i < this.results.summary.length;
-            i += this.CONCURRENCY_LIMIT
-        ) {
-            const chunk = this.results.summary.slice(
-                i,
-                i + this.CONCURRENCY_LIMIT
-            );
-            const chunkPromises = chunk.map((peer) => this.testPeer(peer));
+        // Process IPs in chunks to maintain concurrency limit
+        for (let i = 0; i < IP_ADDRESSES.length; i += this.CONCURRENCY_LIMIT) {
+            const chunk = IP_ADDRESSES.slice(i, i + this.CONCURRENCY_LIMIT);
+            const chunkPromises = chunk.map((ip) => this.testIP(ip));
 
             await Promise.all(chunkPromises);
         }
 
         console.log('\nTesting complete!');
-        console.log(`Total peers tested: ${this.testedCount}`);
+        console.log(`Total IPs tested: ${this.testedCount}`);
         console.log(`Working RPC endpoints: ${this.workingCount}`);
     }
 
-    private async testPeer(peer: {
-        address: string;
-        tcpPort: number;
-    }): Promise<void> {
+    private async testIP(ip: string): Promise<void> {
         let isWorking = false;
         this.testedCount++;
 
-        // Try each common RPC port
+        // Try each RPC port
         for (const port of this.rpcPorts) {
-            isWorking = await this.testRPCEndpoint(peer, port);
+            isWorking = await this.testRPCEndpoint(ip, port);
             if (isWorking) {
                 this.workingCount++;
                 break;
@@ -272,30 +246,23 @@ class RPCTester {
         }
 
         if (!isWorking) {
-            console.log(`✗ No working RPC endpoint found for ${peer.address}`);
+            console.log(`✗ No working RPC endpoint found for ${ip}`);
         }
 
         // Progress update
         const progress = (
-            (this.testedCount / this.results!.totalPeers) *
+            (this.testedCount / IP_ADDRESSES.length) *
             100
         ).toFixed(1);
         console.log(
-            `Progress: ${progress}% (${this.testedCount}/${
-                this.results!.totalPeers
-            }) - Working endpoints: ${this.workingCount}`
+            `Progress: ${progress}% (${this.testedCount}/${IP_ADDRESSES.length}) - Working endpoints: ${this.workingCount}`
         );
     }
 
     async saveResults(): Promise<void> {
-        if (!this.results) {
-            throw new Error('No discovery results loaded');
-        }
-
         const summary = {
             timestamp: new Date().toISOString(),
-            originalDiscoveryTimestamp: this.results.timestamp,
-            totalPeersTested: this.results.totalPeers,
+            totalIPsTested: IP_ADDRESSES.length,
             workingCount: this.workingPeers.size,
             summary: Array.from(this.workingPeers.values()).map((endpoint) => ({
                 url: endpoint.url,
@@ -324,11 +291,8 @@ async function main() {
     const tester = new RPCTester();
 
     try {
-        // Load the latest discovery results
-        await tester.loadLatestResults();
-
-        // Test all peers
-        await tester.testAllPeers();
+        // Test all IPs
+        await tester.testAllIPs();
 
         // Save results
         await tester.saveResults();
