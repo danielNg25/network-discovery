@@ -27,12 +27,15 @@ class LogQuery {
                 if (logs.length > 0) {
                     console.log(`\nEvents in pending block (${logs.length}):`);
                     for (const log of logs) {
-                        console.log(`\nEvent: ${log.transactionHash}`);
-                        console.log(`Address: ${log.address}`);
-                        console.log(`Block: ${log.blockNumber}`);
-                        console.log(
-                            `Current timestamp: ${new Date().toISOString()}`
-                        );
+                        if (log.blockNumber > this.lastBlock) {
+                            console.log(`\nEvent: ${log.transactionHash}`);
+                            console.log(`Address: ${log.address}`);
+                            console.log(`Block: ${log.blockNumber}`);
+                            console.log(
+                                `Current timestamp: ${new Date().toISOString()}`
+                            );
+                            this.lastBlock = log.blockNumber;
+                        }
                     }
                 }
             } catch (error) {
