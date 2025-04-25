@@ -29,8 +29,10 @@ class LogQuery {
                     for (const log of logs) {
                         console.log(`\nEvent: ${log.transactionHash}`);
                         console.log(`Address: ${log.address}`);
-                        console.log(`Topics: ${log.topics.join(', ')}`);
-                        console.log(`Data: ${log.data}`);
+                        console.log(`Block: ${log.blockNumber}`);
+                        console.log(
+                            `Current timestamp: ${new Date().toISOString()}`
+                        );
                     }
                 }
             } catch (error) {
