@@ -56,7 +56,7 @@ class LogQuery {
 }
 
 // Example usage
-const rpcUrl = 'http://0.0.0.0:26545';
+const rpcUrl = 'https://flare.rpc.thirdweb.com';
 const logQuery = new LogQuery(rpcUrl, 100); // Poll every 100ms
 
 // Handle process termination

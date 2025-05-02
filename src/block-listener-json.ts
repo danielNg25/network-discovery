@@ -1,5 +1,7 @@
 import { ethers } from 'ethers';
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 interface BlockStats {
     blockNumber: number;
     timestamp: number;
@@ -18,7 +20,6 @@ class BlockListener {
     private startTime = Date.now();
     private stats: BlockStats[] = [];
     private maxStats = 100;
-    private pollingInterval: NodeJS.Timeout | null = null;
     private isRunning = false;
 
     constructor(private url: string, private pollInterval: number = 1000) {
@@ -33,10 +34,8 @@ class BlockListener {
         const currentBlock = await this.provider.getBlockNumber();
         await this.handleNewBlock(currentBlock);
 
-        // Start polling
-        this.pollingInterval = setInterval(async () => {
-            if (!this.isRunning) return;
-
+        // Start continuous polling
+        while (this.isRunning) {
             try {
                 const latestBlock = await this.provider.getBlockNumber();
                 if (latestBlock > this.lastBlockNumber) {
@@ -45,11 +44,11 @@ class BlockListener {
             } catch (error) {
                 console.error('Error polling for new blocks:', error);
             }
-        }, this.pollInterval);
+            await sleep(this.pollInterval);
+        }
     }
 
     private async handleNewBlock(blockNumber: number) {
-        const processingStart = Date.now();
         const block = await this.provider.getBlock(blockNumber);
         if (!block) return;
 
@@ -93,59 +92,26 @@ class BlockListener {
 
         console.log('\nNew Block Received:');
         console.log(`Block Number: ${block.number}`);
-        console.log(`Block Hash: ${block.hash}`);
         console.log(
             `Block Timestamp: ${new Date(block.timestamp * 1000).toISOString()}`
         );
         console.log(`Current Time: ${new Date().toISOString()}`);
-        console.log(`Time Since Start: ${(timeSinceStart / 1000).toFixed(2)}s`);
         console.log(`Total Latency: ${currentTime - block.timestamp * 1000}ms`);
-        console.log(`Processing Time: ${currentTime - processingStart}ms`);
-        console.log(`Avg Processing Time: ${avgProcessingTime.toFixed(2)}ms`);
         if (blockTime > 0) {
             console.log(`Block Time: ${blockTime}ms`);
-            console.log(
-                `Avg Block Time (last ${
-                    this.stats.length
-                }): ${avgBlockTime.toFixed(2)}ms`
-            );
         }
-        console.log(`Gas Used: ${ethers.formatUnits(block.gasUsed, 0)}`);
-        console.log(`Gas Limit: ${ethers.formatUnits(block.gasLimit, 0)}`);
-        console.log(
-            `Gas Usage: ${(
-                (Number(block.gasUsed) / Number(block.gasLimit)) *
-                100
-            ).toFixed(2)}%`
-        );
-        console.log(`Avg Gas Used: ${ethers.formatUnits(avgGasUsed, 0)}`);
-        console.log(`Avg Gas Limit: ${ethers.formatUnits(avgGasLimit, 0)}`);
-        if (block.baseFeePerGas) {
-            console.log(
-                `Base Fee: ${ethers.formatUnits(
-                    block.baseFeePerGas,
-                    'gwei'
-                )} gwei`
-            );
-        }
-        console.log(`Parent Hash: ${block.parentHash}`);
-
         this.lastBlockNumber = block.number;
         this.lastTimestamp = block.timestamp * 1000;
     }
 
     stop() {
         this.isRunning = false;
-        if (this.pollingInterval) {
-            clearInterval(this.pollingInterval);
-            this.pollingInterval = null;
-        }
     }
 }
 
 // Example usage
-const rpcUrl = 'http://0.0.0.0:26545';
-const listener = new BlockListener(rpcUrl, 1000); // Poll every second
+const rpcUrl = 'http://0.0.0.0:9650/ext/bc/C/rpc';
+const listener = new BlockListener(rpcUrl, 50); // Poll every 100ms
 
 // Handle process termination
 process.on('SIGINT', () => {
