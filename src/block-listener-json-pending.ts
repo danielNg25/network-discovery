@@ -212,7 +212,7 @@ class BlockListener {
 }
 
 // Example usage
-const rpcUrl = 'https://flare-api.flare.network/ext/C/rpc';
+const rpcUrl = 'http://0.0.0.0:9650/ext/bc/C/rpc';
 const listener = new BlockListener(rpcUrl, 50); // Poll every 50ms
 
 // Handle process termination
