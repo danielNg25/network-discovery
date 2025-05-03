@@ -62,7 +62,9 @@ class BlockListener {
         const blockInterval =
             this.lastBlockNumber > 0 ? blockTimestamp - this.lastTimestamp : 0;
         const timeSinceLastReceive =
-            this.lastReceiveTime > 0 ? currentTime - this.lastReceiveTime : 0;
+            this.lastReceiveTime > 0
+                ? blockTimestamp - this.lastReceiveTime
+                : 0;
 
         // Check if we received this block before its creation time
         const receivedBeforeCreation = currentTime < blockTimestamp;
@@ -90,55 +92,17 @@ class BlockListener {
         }
 
         // Calculate averages
-        const avgBlockTime =
-            this.stats.reduce((sum, s) => sum + s.blockTime, 0) /
-            this.stats.length;
-        const avgGasUsed =
-            this.stats.reduce((sum, s) => sum + s.gasUsed, 0n) /
-            BigInt(this.stats.length);
-        const avgGasLimit =
-            this.stats.reduce((sum, s) => sum + s.gasLimit, 0n) /
-            BigInt(this.stats.length);
-        const avgProcessingTime =
-            this.stats.reduce((sum, s) => sum + s.processingTime, 0) /
-            this.stats.length;
-        const avgDiscoveryTime =
-            this.stats.reduce(
-                (sum, s) => sum + Math.abs(s.blockDiscoveryTime),
-                0
-            ) / this.stats.length;
-
         console.log('\nNew Block Received:');
         console.log(`Block Number: ${block.number}`);
         console.log(
             `Block Timestamp: ${new Date(blockTimestamp).toISOString()}`
         );
         console.log(`Current Time: ${new Date(currentTime).toISOString()}`);
-        console.log(
-            `Block Discovery Time: ${
-                receivedBeforeCreation ? '-' : ''
-            }${Math.abs(
-                blockDiscoveryTime
-            )}ms (time between block creation and our discovery)`
-        );
-        console.log(
-            `Block Interval: ${blockInterval}ms (time since last block)`
-        );
+        console.log(`Block Discovery Time: ${Math.abs(blockDiscoveryTime)}ms`);
+        console.log(`Block Interval: ${blockInterval}ms`);
         console.log(`Time Since Last Receive: ${timeSinceLastReceive}ms`);
-        console.log(`Processing Time: ${currentTime - blockTimestamp}ms`);
         if (receivedBeforeCreation) {
             console.log('⚠️ Received block before its creation time!');
-        }
-
-        if (this.stats.length > 1) {
-            console.log('\nAverages:');
-            console.log(`Average Block Time: ${avgBlockTime.toFixed(2)}ms`);
-            console.log(
-                `Average Discovery Time: ${avgDiscoveryTime.toFixed(2)}ms`
-            );
-            console.log(
-                `Average Processing Time: ${avgProcessingTime.toFixed(2)}ms`
-            );
         }
 
         this.lastBlockNumber = block.number;
