@@ -53,14 +53,14 @@ class BlockListener {
             console.error('WebSocket error:', error);
         });
 
-        // Handle WebSocket close
-        this.provider.on('close', (code, reason) => {
-            console.log(`WebSocket closed: ${code} - ${reason}`);
-            if (this.isRunning) {
-                console.log('Attempting to reconnect...');
-                this.reconnect();
-            }
-        });
+        // // Handle WebSocket close
+        // this.provider.on('close', (code, reason) => {
+        //     console.log(`WebSocket closed: ${code} - ${reason}`);
+        //     if (this.isRunning) {
+        //         console.log('Attempting to reconnect...');
+        //         this.reconnect();
+        //     }
+        // });
     }
 
     private async handleNewBlock(blockNumber: number) {
