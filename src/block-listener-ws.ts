@@ -48,6 +48,32 @@ class BlockListener {
             }
         });
 
+        this.provider.on('pending', async (txHash: string) => {
+            if (!this.isRunning) return;
+            try {
+                const tx = await this.provider.getTransaction(txHash);
+                if (tx) {
+                    console.log(
+                        'Pending transaction:',
+                        tx.hash,
+                        new Date().toISOString()
+                    );
+                    const receipt = await this.provider.getTransactionReceipt(
+                        txHash
+                    );
+                    if (receipt) {
+                        if (receipt.logs.length > 0) {
+                            for (const log of receipt.logs) {
+                                console.log('Log:', receipt.hash, log.topics);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error handling pending transaction:', error);
+            }
+        });
+
         // Handle WebSocket connection errors
         this.provider.on('error', (error) => {
             console.error('WebSocket error:', error);
@@ -139,7 +165,7 @@ class BlockListener {
 }
 
 // Example usage
-const wsUrl = 'ws://0.0.0.0:9650/ext/bc/C/ws';
+const wsUrl = 'ws://51.195.190.153:9650/ext/bc/C/ws';
 const listener = new BlockListener(wsUrl);
 
 // Handle process termination
