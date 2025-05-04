@@ -61,19 +61,14 @@ class BlockListener {
                     txHash
                 );
                 if (receipt) {
-                    if (receipt.logs.length > 0) {
-                        for (const log of receipt.logs) {
-                            console.log(
-                                new Date().toISOString(),
-                                'Log:',
-                                receipt.hash,
-                                log.topics,
-                                'time taken:',
-                                Date.now() - timestamp,
-                                'ms'
-                            );
-                        }
-                    }
+                    console.log(
+                        new Date().toISOString(),
+                        'Log:',
+                        receipt.hash,
+                        'time taken:',
+                        Date.now() - timestamp,
+                        'ms'
+                    );
                 }
             } catch (error) {
                 console.error('Error handling pending transaction:', error);
